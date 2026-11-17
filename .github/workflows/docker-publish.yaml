@@ -13,12 +13,12 @@ on:
         required: true
         type: string
   push:
-    branches: [main]
+    branches: [main, "snapshot/**"]
     tags:
       - "v*"
 
 env:
-  GHCR_IMAGE: ghcr.io/${{ github.repository }}
+  GHCR_IMAGE: ghcr.io/decade-x-ecosystem/siglet
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -74,6 +74,8 @@ jobs:
           #    come from inputs.version instead of the ref.
           tags: |
             type=raw,value=dev,enable=${{ inputs.version == '' && github.ref == 'refs/heads/main' }}
+            type=ref,event=branch,enable=${{ inputs.version == '' && startsWith(github.ref, 'refs/heads/snapshot/') }}
+            type=sha,enable=${{ inputs.version == '' && startsWith(github.ref, 'refs/heads/snapshot/') }}
             type=match,pattern=v(\d+\.\d+\.\d+),group=1,enable=${{ inputs.version == '' }}
             type=match,pattern=v(\d+\.\d+),group=1,enable=${{ inputs.version == '' }}
             type=raw,value=${{ steps.ver.outputs.full }},enable=${{ inputs.version != '' }}
@@ -147,6 +149,8 @@ jobs:
           #    come from inputs.version instead of the ref.
           tags: |
             type=raw,value=dev,enable=${{ inputs.version == '' && github.ref == 'refs/heads/main' }}
+            type=ref,event=branch,enable=${{ inputs.version == '' && startsWith(github.ref, 'refs/heads/snapshot/') }}
+            type=sha,enable=${{ inputs.version == '' && startsWith(github.ref, 'refs/heads/snapshot/') }}
             type=match,pattern=v(\d+\.\d+\.\d+),group=1,enable=${{ inputs.version == '' }}
             type=match,pattern=v(\d+\.\d+),group=1,enable=${{ inputs.version == '' }}
             type=raw,value=${{ steps.ver.outputs.full }},enable=${{ inputs.version != '' }}
