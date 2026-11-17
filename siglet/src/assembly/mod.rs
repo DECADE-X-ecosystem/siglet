@@ -1,4 +1,5 @@
 //  Copyright (c) 2026 Metaform Systems, Inc
+//  Copyright (c) 2026 Airbus SAS
 //
 //  This program and the accompanying materials are made available under the
 //  terms of the Apache License, Version 2.0 which is available at
@@ -8,6 +9,7 @@
 //
 //  Contributors:
 //       Metaform Systems, Inc. - initial API and implementation
+//       Airbus SAS - configurable token lifetimes
 //
 
 use crate::config::{PostgresPoolConfig, SigletConfig, StorageBackend, TransferType, VaultAuth, VaultConfig};
@@ -567,6 +569,8 @@ fn create_token_manager(
             .issuer_id(issuer_id.to_string())
             .refresh_endpoint(refresh_endpoint)
             .server_secret(server_secret)
+            .token_duration(cfg.token.access_token_ttl())
+            .renewal_token_duration(cfg.token.refresh_token_ttl())
             .token_store(renewable_token_store)
             .token_generator(jwt_generator)
             .client_verifier(client_verifier)

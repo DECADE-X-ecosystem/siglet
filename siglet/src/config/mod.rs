@@ -1,4 +1,5 @@
 //  Copyright (c) 2026 Metaform Systems, Inc
+//  Copyright (c) 2026 Airbus SAS
 //
 //  This program and the accompanying materials are made available under the
 //  terms of the Apache License, Version 2.0 which is available at
@@ -8,6 +9,7 @@
 //
 //  Contributors:
 //       Metaform Systems, Inc. - initial API and implementation
+//       Airbus SAS - configurable token lifetimes
 //
 use bon::Builder;
 use config::{Config, Environment, File};
@@ -52,6 +54,15 @@ pub const DEFAULT_VAULT_SIGNING_KEY_NAME: &str = "signing-siglet";
 
 /// Default JWKS cache TTL in seconds for the signaling-API JWT verifier.
 pub const DEFAULT_JWKS_CACHE_TTL_SECONDS: u64 = 300;
+
+/// Default lifetime in seconds of issued access tokens.
+pub const DEFAULT_ACCESS_TOKEN_TTL_SECONDS: i64 = 3600;
+
+/// Upper bound for `token.access_token_ttl_seconds`.
+pub const MAX_ACCESS_TOKEN_TTL_SECONDS: i64 = 86_400;
+
+/// Default lifetime in seconds of issued refresh tokens.
+pub const DEFAULT_REFRESH_TOKEN_TTL_SECONDS: i64 = 172_800;
 
 /// Default expected audience for tokens accepted on the signaling API.
 ///
@@ -593,6 +604,25 @@ pub struct TokenConfig {
     /// allowed_hosts = ["provider.example.com", "*.dataspace.example"]
     /// ```
     pub refresh_endpoint_policy: RefreshEndpointPolicy,
+    /// Lifetime in seconds of issued access tokens. Defaults to [`DEFAULT_ACCESS_TOKEN_TTL_SECONDS`].
+    pub access_token_ttl_seconds: Option<i64>,
+    /// Lifetime in seconds of issued refresh tokens. Defaults to [`DEFAULT_REFRESH_TOKEN_TTL_SECONDS`]. Must be
+    /// greater than the access token lifetime.
+    pub refresh_token_ttl_seconds: Option<i64>,
+}
+
+impl TokenConfig {
+    /// The configured access token lifetime, or the default.
+    pub fn access_token_ttl(&self) -> i64 {
+        self.access_token_ttl_seconds
+            .unwrap_or(DEFAULT_ACCESS_TOKEN_TTL_SECONDS)
+    }
+
+    /// The configured refresh token lifetime, or the default.
+    pub fn refresh_token_ttl(&self) -> i64 {
+        self.refresh_token_ttl_seconds
+            .unwrap_or(DEFAULT_REFRESH_TOKEN_TTL_SECONDS)
+    }
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -695,6 +725,20 @@ impl SigletConfig {
                     secret_hex
                 ));
             }
+        }
+
+        // Token lifetimes
+        let access_ttl = self.token.access_token_ttl();
+        if !(1..=MAX_ACCESS_TOKEN_TTL_SECONDS).contains(&access_ttl) {
+            errors.push(format!(
+                "token.access_token_ttl_seconds must be between 1 and {MAX_ACCESS_TOKEN_TTL_SECONDS}, got {access_ttl}"
+            ));
+        }
+        if self.token.refresh_token_ttl() <= access_ttl {
+            errors.push(format!(
+                "token.refresh_token_ttl_seconds must be greater than the access token lifetime ({access_ttl}), got {}",
+                self.token.refresh_token_ttl()
+            ));
         }
 
         // Validate port numbers don't conflict

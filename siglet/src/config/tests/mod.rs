@@ -1,4 +1,5 @@
 //  Copyright (c) 2026 Metaform Systems, Inc
+//  Copyright (c) 2026 Airbus SAS
 //
 //  This program and the accompanying materials are made available under the
 //  terms of the Apache License, Version 2.0 which is available at
@@ -8,12 +9,14 @@
 //
 //  Contributors:
 //       Metaform Systems, Inc. - initial API and implementation
+//       Airbus SAS - configurable token lifetimes
 //
 
 #![allow(clippy::unwrap_used)]
 
 use crate::config::{
-    ClaimMapping, EndpointMapping, ManagementApiAuthConfig, PostgresPoolConfig, SigletConfig, SignalingAuthConfig,
+    ClaimMapping, DEFAULT_ACCESS_TOKEN_TTL_SECONDS, DEFAULT_REFRESH_TOKEN_TTL_SECONDS, EndpointMapping,
+    MAX_ACCESS_TOKEN_TTL_SECONDS, ManagementApiAuthConfig, PostgresPoolConfig, SigletConfig, SignalingAuthConfig,
     StorageBackend, TokenApiAuthConfig, TokenConfig, TokenSource, TransferType, ValidationError, VaultAuth,
     VaultConfig,
 };
@@ -2385,4 +2388,64 @@ fn test_postgres_pool_zero_idle_and_lifetime_disable_limits() {
 
     assert_eq!(options.get_idle_timeout(), None);
     assert_eq!(options.get_max_lifetime(), None);
+}
+
+#[test]
+fn test_token_lifetimes_default() {
+    let config = create_valid_config();
+    assert_eq!(config.token.access_token_ttl(), DEFAULT_ACCESS_TOKEN_TTL_SECONDS);
+    assert_eq!(config.token.refresh_token_ttl(), DEFAULT_REFRESH_TOKEN_TTL_SECONDS);
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn test_short_access_token_lifetime() {
+    let mut config = create_valid_config();
+    config.token.access_token_ttl_seconds = Some(300);
+    assert_eq!(config.token.access_token_ttl(), 300);
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn test_access_token_lifetime_out_of_range() {
+    for ttl in [0, -1, MAX_ACCESS_TOKEN_TTL_SECONDS + 1] {
+        let mut config = create_valid_config();
+        config.token.access_token_ttl_seconds = Some(ttl);
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.messages()
+                .iter()
+                .any(|m| m.contains("token.access_token_ttl_seconds must be between")),
+            "{ttl}: {:?}",
+            err.messages()
+        );
+    }
+}
+
+#[test]
+fn test_refresh_token_lifetime_must_exceed_access_token_lifetime() {
+    let mut config = create_valid_config();
+    config.token.access_token_ttl_seconds = Some(300);
+    config.token.refresh_token_ttl_seconds = Some(300);
+    let err = config.validate().unwrap_err();
+    assert!(
+        err.messages()
+            .iter()
+            .any(|m| m.contains("token.refresh_token_ttl_seconds must be greater"))
+    );
+}
+
+#[test]
+fn test_token_lifetimes_from_toml() {
+    let config: SigletConfig = config::Config::builder()
+        .add_source(config::File::from_str(
+            "[token]\naccess_token_ttl_seconds = 300\nrefresh_token_ttl_seconds = 86400\n",
+            config::FileFormat::Toml,
+        ))
+        .build()
+        .unwrap()
+        .try_deserialize()
+        .unwrap();
+    assert_eq!(config.token.access_token_ttl(), 300);
+    assert_eq!(config.token.refresh_token_ttl(), 86_400);
 }

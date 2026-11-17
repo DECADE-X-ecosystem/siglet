@@ -938,6 +938,10 @@ refresh_endpoint = "https://siglet.example.com/token"
 # Hex-encoded secret used to derive symmetric keys (HMAC, etc.).
 # Must be at least 16 bytes (32 hex chars). Generate with: openssl rand -hex 32
 server_secret = "0102030405060708090a0b0c0d0e0f10..."
+# Lifetime in seconds of issued access tokens. Default: 3600, maximum: 86400
+access_token_ttl_seconds = 3600
+# Lifetime in seconds of issued refresh tokens. Default: 172800. Must be greater than the access token lifetime
+refresh_token_ttl_seconds = 172800
 
 # Which counterparty refresh endpoints Siglet will call (consumer side). The endpoint arrives in
 # the provider's data address and receives the refresh token plus a proof JWT signed with the
